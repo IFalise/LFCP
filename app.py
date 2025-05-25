@@ -107,13 +107,21 @@ preset_choice = st.selectbox(
 if preset_choice != preset_label:
     dq = delta_o_cm[preset_choice]
     λ_nm = wavelength_nm(dq)
-    colour = nm_to_rgb(λ_nm)
+    absorbed_hex = nm_to_rgb(λ_nm)          # colour of the absorbed band
+    solution_hex = complement_hex(absorbed_hex)  # complementary solution colour
 
     st.markdown(f"**Preset selected:** `{preset_choice}`")
     st.markdown(f"10 Dq = `{dq} cm⁻¹`  →  λ<sub>max</sub> ≈ `{λ_nm:.0f} nm`")
+    # Display absorbed vs. complementary solution colour
     st.markdown(
-        f"<div style='width:120px;height:50px;border:1px solid #000;"
-        f"background:{colour}'></div>",
+        "<div style='display:flex;gap:20px;'>"
+        f"<div style='text-align:center'>"
+        f"<div style='width:120px;height:50px;border:1px solid #000;background:{absorbed_hex}'></div>"
+        "<small>Absorption</small></div>"
+        f"<div style='text-align:center'>"
+        f"<div style='width:120px;height:50px;border:1px solid #000;background:{solution_hex}'></div>"
+        "<small>Solution</small></div>"
+        "</div>",
         unsafe_allow_html=True,
     )
 
