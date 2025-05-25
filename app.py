@@ -3,12 +3,15 @@ from data import (
     delta_o_cm,
     metal_g,
     ligand_data,
+    ligand_AOM,
+    metal_B_free,
+    metal_radii,
     geometry_coord,
     geometry_scale,
+    geometry_aom_coeff,
     electron_config,
     ts_multiplier,
-    # NEW:
-    metal_DqH2O,
+    metal_DqH2O,   # kept for presets
     ts_bands,
     ct_band,
 )
@@ -72,6 +75,24 @@ def average_lf(ligand_counts: dict[str, int]) -> float:
         site_sum += sites
         lf_sum += sites * entry["LF"]
     return lf_sum / site_sum if site_sum else 1.0
+
+
+def average_aom(ligand_counts: dict[str, int]) -> tuple[float, float, float]:
+    """
+    Return donor‑site‑weighted averages of eσ, eπ and eπ* for the selected
+    ligand set.  Missing ligands default to eσ=4000, eπ=0.
+    """
+    site_sum = es_sum = epi_sum = epi_star_sum = 0.0
+    for lig, n_lig in ligand_counts.items():
+        sites = ligand_data[lig]["dent"] * n_lig
+        site_sum += sites
+        entry = ligand_AOM.get(lig, {"e_sigma": 4000})
+        es_sum += sites * entry.get("e_sigma", 0)
+        epi_sum += sites * entry.get("e_pi", 0)
+        epi_star_sum += sites * entry.get("e_pi_star", 0)
+    if site_sum == 0:
+        return 0, 0, 0
+    return es_sum / site_sum, epi_sum / site_sum, epi_star_sum / site_sum
 
 
 st.title("Ligand Field Colour Predictor")
@@ -139,9 +160,22 @@ else:
 
     # calculation
     if submit:
-        # --- ligand‑field maths --------------------------------------------
-        lf_bar = average_lf(ligand_counts)
-        ten_Dq_base = metal_DqH2O[metal] * lf_bar * geometry_scale[geometry]
+        # --- Angular Overlap Model ----------------------------------------
+        e_sigma, e_pi, e_pi_star = average_aom(ligand_counts)
+
+        # Base octahedral 10 Dq from AOM: ΔOct = 3 eσ – 4 eπ  (LibreTexts Eq {1})
+        delta_oct = 3 * e_sigma - 4 * e_pi
+
+        # Geometry conversion
+        if geometry == "Octahedral":
+            ten_Dq_base = delta_oct
+        elif geometry == "Tetrahedral":
+            ten_Dq_base = (-4 / 9) * delta_oct
+        else:
+            # fallback to existing empirical scale for less common geometries
+            ten_Dq_base = delta_oct * geometry_scale.get(geometry, 1.0)
+
+        ten_Dq_base = abs(ten_Dq_base)  # magnitude only for band energies
 
         dn, spin = electron_config[metal]
         ratios = ts_bands.get((dn, spin, geometry), ts_bands.get((dn, spin, "Octahedral")))
@@ -157,14 +191,20 @@ else:
         if not visible_nms:
             visible_nms.append(1e7 / (ratios[0] * ten_Dq_base))
 
-        # Charge‑transfer fallback (override only if d–d bands UV/IR)
+        # Charge‑transfer fallback (use intrinsic eπ* if available)
         if (len(visible_nms) == 1) and not (380 <= visible_nms[0] <= 780):
-            for lig in ligand_counts:
-                if lig in ct_band:
-                    ct_nm = 1e7 / ct_band[lig]
-                    if 380 <= ct_nm <= 780:
-                        visible_nms = [ct_nm]
-                        break
+            if e_pi_star != 0:
+                ct_cm = abs(-e_pi_star) + abs(delta_oct)
+                ct_nm = 1e7 / ct_cm
+                if 380 <= ct_nm <= 780:
+                    visible_nms = [ct_nm]
+            else:
+                for lig in ligand_counts:
+                    if lig in ct_band:
+                        ct_nm = 1e7 / ct_band[lig]
+                        if 380 <= ct_nm <= 780:
+                            visible_nms = [ct_nm]
+                            break
 
         # Colour swatch: mix complements of all visible bands
         absorbed_hexes = [nm_to_rgb(nm) for nm in visible_nms]
