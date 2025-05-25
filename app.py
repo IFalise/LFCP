@@ -55,6 +55,14 @@ def complement_hex(hexcode: str) -> str:
     return f"#{r:02X}{g:02X}{b:02X}"
 
 
+def mix_hex(*codes: str) -> str:
+    """Return average of ≥1 hex colours."""
+    r = sum(int(c[1:3], 16) for c in codes) // len(codes)
+    g = sum(int(c[3:5], 16) for c in codes) // len(codes)
+    b = sum(int(c[5:7], 16) for c in codes) // len(codes)
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
 def average_lf(ligand_counts: dict[str, int]) -> float:
     """Donor‑site‑weighted average ligand‑field strength LF."""
     site_sum = lf_sum = 0.0
@@ -137,32 +145,34 @@ else:
 
         dn, spin = electron_config[metal]
         ratios = ts_bands.get((dn, spin, geometry), ts_bands.get((dn, spin, "Octahedral")))
-        band_cm = None
+
+        visible_nms: list[float] = []
         for r in ratios:
             test_cm = r * ten_Dq_base
-            test_nm = 1e7 / test_cm
-            if 380 <= test_nm <= 780:
-                band_cm = test_cm
-                break
+            nm = 1e7 / test_cm
+            if 380 <= nm <= 780:
+                visible_nms.append(nm)
+
         # fall back to first ratio if nothing visible
-        if band_cm is None:
-            band_cm = ratios[0] * ten_Dq_base
+        if not visible_nms:
+            visible_nms.append(1e7 / (ratios[0] * ten_Dq_base))
 
-        lam_nm = 1e7 / band_cm
-
-        # if still UV/IR try charge‑transfer from strongest π‑acceptor ligand
-        if not (380 <= lam_nm <= 780):
+        # Charge‑transfer fallback (override only if d–d bands UV/IR)
+        if (len(visible_nms) == 1) and not (380 <= visible_nms[0] <= 780):
             for lig in ligand_counts:
                 if lig in ct_band:
-                    ct_cm = ct_band[lig]
-                    ct_nm = 1e7 / ct_cm
+                    ct_nm = 1e7 / ct_band[lig]
                     if 380 <= ct_nm <= 780:
-                        lam_nm = ct_nm
-                        band_cm = ct_cm
+                        visible_nms = [ct_nm]
                         break
 
-        absorbed_hex = nm_to_rgb(lam_nm)
-        colour = complement_hex(absorbed_hex)
+        # Colour swatch: mix complements of all visible bands
+        absorbed_hexes = [nm_to_rgb(nm) for nm in visible_nms]
+        colour = mix_hex(*(complement_hex(hx) for hx in absorbed_hexes))
+
+        # Report the *lowest‑energy* visible band
+        lam_nm = min(visible_nms)
+        band_cm = 1e7 / lam_nm
 
         st.markdown(f"Metal: {metal} &nbsp; | &nbsp; Geometry: {geometry}")
         st.markdown(
