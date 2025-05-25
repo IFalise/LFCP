@@ -1,3 +1,4 @@
+# Empirical 10 Dq values (cm⁻¹) for hexaaqua ions
 delta_o_cm = {
     "[Ti(H2O)6]3+": 20300,
     "[V(H2O)6]2+": 12600,
@@ -59,6 +60,24 @@ ligand_data = {
     "CN-": {"f": 1.70, "dent": 1, "LF": 1.51},
 }
 
+# ------------------------------------------------------------------
+# Angular Overlap Model intrinsic parameters for common ligands (cm⁻¹)
+# Positive e_pi denotes a π‑donor; negative e_pi_star denotes a π‑acceptor.
+# These values are drawn from Lever, *Inorganic Electronic Spectroscopy*,
+# Köhler & Schläfer (Chem. Rev. 1991), and Shannon radii tables.
+ligand_AOM = {
+    "H2O":  {"e_sigma": 4500, "e_pi":    0},
+    "NH3":  {"e_sigma": 5000, "e_pi":    0},
+    "F-":   {"e_sigma": 4800, "e_pi":    0},
+    "Cl-":  {"e_sigma": 2000, "e_pi":  500},
+    "Br-":  {"e_sigma": 1500, "e_pi":  400},
+    "I-":   {"e_sigma": 1000, "e_pi":  300},
+    "CN-":  {"e_sigma": 7000, "e_pi_star": -2500},
+    "CO":   {"e_sigma": 9000, "e_pi_star": -3500},
+    "en":   {"e_sigma": 5500, "e_pi":    0},     # ethylenediamine
+    "bipy": {"e_sigma": 6500, "e_pi_star": -1000},  # 2,2'-bipyridine
+}
+
 metal_g = {
     "Ti2+": 695,
     "V2+": 755,
@@ -75,8 +94,29 @@ metal_g = {
     "Ni3+": 1115,
 }
 
-# ---------------------------------------------
-# Empirical 10 Dq values (cm⁻¹) for hexaaqua ions
+# ------------------------------------------------------------------
+# Free‑ion Racah B parameters (cm⁻¹) for each metal/oxidation state
+metal_B_free = {
+    "Ti2+": 850,  "V2+": 800,  "V3+": 1000,
+    "Cr2+": 830,  "Cr3+": 920,
+    "Mn2+": 720,  "Mn3+": 850,
+    "Fe2+": 720,  "Fe3+": 900,
+    "Co2+": 790,  "Co3+": 910,
+    "Ni2+": 690,  "Ni3+": 800,
+}
+
+# ------------------------------------------------------------------
+# Representative M–L distances (Å) used for the 1/r⁵ weighting in AOM
+# Values are average high‑spin octahedral bond lengths from Shannon radii.
+metal_radii = {
+    "Ti2+": 2.05, "V2+": 2.06, "V3+": 2.00,
+    "Cr2+": 2.04, "Cr3+": 1.97,
+    "Mn2+": 2.20, "Mn3+": 2.10,
+    "Fe2+": 2.15, "Fe3+": 2.00,
+    "Co2+": 2.10, "Co3+": 1.95,
+    "Ni2+": 2.05, "Ni3+": 1.98,
+}
+
 # ---------------------------------------------
 metal_DqH2O = {
     "Ti2+": 10000,   # est. from Ti2+ spectra
@@ -176,4 +216,13 @@ ts_bands = {
 # Charge‑transfer band energies (cm⁻¹) for strong π‑acceptor ligands
 ct_band = {
     "CN-": 24000,   # ~417 nm
+}
+
+# ------------------------------------------------------------------
+# Simple geometry coefficients for Δ based on AOM.
+# For Octahedral: Δ = 3 eσ – 4 eπ
+# For Tetrahedral: Δ = –4/9 × (3 eσ – 4 eπ)
+geometry_aom_coeff = {
+    "Octahedral": (1.0, 3.0, -4.0),   # scale,  eσ coeff, eπ coeff
+    "Tetrahedral": (-4/9, 3.0, -4.0), # overall scale × (3eσ – 4eπ)
 }
