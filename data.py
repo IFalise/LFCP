@@ -79,12 +79,18 @@ metal_g = {
 # Empirical 10 Dq values (cm⁻¹) for hexaaqua ions
 # ---------------------------------------------
 metal_DqH2O = {
-    "Cr2+": 13900,  # Cr(H2O)6 2+
-    "Cr3+": 17400,  # Cr(H2O)6 3+
-    "V3+":  18900,  # V(H2O)6 3+
-    "Co2+":  9300,  # Co(H2O)6 2+
-    "Co3+": 18600,  # Co(H2O)6 3+
-    "Ni2+":  8600,  # Ni(H2O)6 2+
+    "Ti2+": 10000,   # est. from Ti2+ spectra
+    "V2+":  12600,   # from [V(H2O)6]2+
+    "V3+":  18900,   # from [V(H2O)6]3+
+    "Cr2+": 13900,
+    "Cr3+": 17400,
+    "Mn2+":  8500,   # from [Mn(H2O)6]2+
+    "Mn3+": 21000,   # from [Mn(H2O)6]3+
+    "Fe2+": 10400,   # from [Fe(H2O)6]2+
+    "Fe3+": 14300,   # from [Fe(H2O)6]3+
+    "Co2+":  9300,
+    "Co3+": 18600,
+    "Ni2+":  8600,
 }
 
 geometry_coord = {
