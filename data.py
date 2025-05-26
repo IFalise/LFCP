@@ -61,6 +61,30 @@ ligand_data = {
 }
 
 # ------------------------------------------------------------------
+# Experimentally‑anchored nephelauxetic factors (β) for selected ligands.
+# Everything not listed here falls back to a linear LF‑β regression
+# (see beta_regression below).
+beta_ligand = {
+    # Halides
+    "F-": 0.97, "Cl-": 0.78, "Br-": 0.72, "I-": 0.65,
+    # Pseudo‑halides / ambidentates
+    "NCS-": 0.80, "SCN-": 0.74, "NCSe-": 0.78,
+    # Simple O / N donors
+    "H2O": 0.96, "EtOH": 0.95, "OCMe2": 0.95, "OPCl3": 0.90,
+    "Me2NCHO": 0.93, "NH3": 0.95, "en": 0.88,
+    # π‑acceptors / mixed
+    "CH3CN": 0.85, "bipy": 0.85, "diars": 0.85,
+    "NO2-": 0.75, "C5H5": 0.65, "CN-": 0.75,
+    # Anionic chelates
+    "(C2O4)2-": 0.87, "(SO3)2-": 0.93, "SC(NH2)2": 0.85,
+}
+
+# Simple linear regression to estimate β from the ligand‑field strength
+# when a ligand is not in beta_ligand.  Derived from literature set
+# after removing outliers.
+beta_regression = {"a": 1.04, "b": -0.15}  # β ≈ a + b·(LF − 0.90)
+
+# ------------------------------------------------------------------
 # Angular Overlap Model intrinsic parameters for common ligands (cm⁻¹)
 # Positive e_pi denotes a π‑donor; negative e_pi_star denotes a π‑acceptor.
 # These values are drawn from Lever, *Inorganic Electronic Spectroscopy*,
@@ -92,6 +116,17 @@ metal_g = {
     "Co3+": 1065,
     "Ni2+": 1030,
     "Ni3+": 1115,
+}
+
+# ------------------------------------------------------------------
+# Free‑ion pairing energies P₀ (cm⁻¹)  ≈ 15 B + 7 C; rounded averages.
+metal_P_free = {
+    "Ti2+": 14500, "V2+": 13800, "V3+": 16800,
+    "Cr2+": 14800, "Cr3+": 17800,
+    "Mn2+": 12000, "Mn3+": 15000,
+    "Fe2+": 12800, "Fe3+": 16000,
+    "Co2+": 15000, "Co3+": 18000,
+    "Ni2+": 13500, "Ni3+": 16500,
 }
 
 # ------------------------------------------------------------------
@@ -211,18 +246,24 @@ ts_bands = {
     ("d8", "HS", "Octahedral"): [1.00, 1.63, 2.62],
     # Tetrahedral (Td)
     ("d7", "HS", "Tetrahedral"): [4.60],
+
+    # Added spin‑forbidden but weakly allowed bands to prevent lookup errors
+    ("d5", "HS", "Octahedral"): [1.82],          # e.g. [Mn(H2O)6]²⁺
+    ("d5", "HS", "Tetrahedral"): [4.50],         # e.g. Mn²⁺ in Td sites
+    ("d5", "LS", "Octahedral"): [2.20],          # e.g. [Fe(CN)6]³⁻ with strong field
 }
 
 # Charge‑transfer band energies (cm⁻¹) for strong π‑acceptor ligands
 ct_band = {
     "CN-": 24000,   # ~417 nm
+    "NO2-": 28500,   # ~351 nm
 }
 
 # ------------------------------------------------------------------
 # Simple geometry coefficients for Δ based on AOM.
-# For Octahedral: Δ = 3 eσ – 4 eπ
-# For Tetrahedral: Δ = –4/9 × (3 eσ – 4 eπ)
+# For Octahedral: Δ = 3 e_sigma – 4 e_pi
+# For Tetrahedral: Δ = –4/9 × (3 e_sigma – 4 e_pi)
 geometry_aom_coeff = {
-    "Octahedral": (1.0, 3.0, -4.0),   # scale,  eσ coeff, eπ coeff
-    "Tetrahedral": (-4/9, 3.0, -4.0), # overall scale × (3eσ – 4eπ)
+    "Octahedral": (1.0, 3.0, -4.0),   # scale,  e_sigma coeff, e_pi coeff
+    "Tetrahedral": (-4/9, 3.0, -4.0), # overall scale × (3e_sigma – 4e_pi)
 }
