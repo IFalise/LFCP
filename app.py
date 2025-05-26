@@ -18,7 +18,13 @@ from data import (
     beta_regression,   # NEW
     metal_P_free,      # NEW
 )
-import matplotlib.pyplot as plt
+# ------------------------------------------------------------------
+# Optional plotting backend (Plotly is lighter + Streamlit‑native)
+try:
+    import plotly.graph_objects as go
+    _PLOT_AVAILABLE = True
+except ModuleNotFoundError:
+    _PLOT_AVAILABLE = False
 
 
 def wavelength_nm(dq_cm: float) -> float:
@@ -284,17 +290,29 @@ else:
                             break
 
         def _show_spectrum(nms: list[float]) -> None:
-            """Plot vertical lines for predicted absorption bands."""
-            fig, ax = plt.subplots(figsize=(4, 1.8))
+            if not _PLOT_AVAILABLE:
+                return  # plotly not available → skip spectrum
+            fig = go.Figure()
             for nm in nms:
-                ax.axvline(nm, color=nm_to_rgb(nm), linewidth=3)
-            ax.set_xlim(380, 780)
-            ax.set_xticks([400, 500, 600, 700])
-            ax.set_xlabel("λ (nm)")
-            ax.set_yticks([])
-            ax.set_title("Predicted absorption bands", fontsize=9)
-            st.pyplot(fig)
+                fig.add_shape(
+                    type="line",
+                    x0=nm, x1=nm,
+                    y0=0,  y1=1,
+                    line=dict(color=nm_to_rgb(nm), width=3),
+                )
+            fig.update_layout(
+                xaxis=dict(range=[380, 780], title="λ (nm)", tickmode="array",
+                           tickvals=[400, 500, 600, 700]),
+                yaxis=dict(visible=False),
+                showlegend=False,
+                height=180,
+                margin=dict(l=0, r=0, t=30, b=0),
+                title_text="Predicted absorption bands",
+                title_font_size=12,
+            )
+            st.plotly_chart(fig, use_container_width=False)
 
+        # Show spectrum only if matplotlib is present (see _PLOT_AVAILABLE flag)
         _show_spectrum(visible_nms)
 
         st.markdown(
