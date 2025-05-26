@@ -14,7 +14,11 @@ from data import (
     metal_DqH2O,   # kept for presets
     ts_bands,
     ct_band,
+    beta_ligand,       # NEW
+    beta_regression,   # NEW
+    metal_P_free,      # NEW
 )
+import matplotlib.pyplot as plt
 
 
 def wavelength_nm(dq_cm: float) -> float:
@@ -23,31 +27,37 @@ def wavelength_nm(dq_cm: float) -> float:
 
 
 def nm_to_rgb(nm: float) -> str:
-    """Visual mapping of 380‑780 nm → Hex colour."""
-    bands = [
-        (380, 400, "#6D007E"),
-        (400, 420, "#6700B4"),
-        (420, 440, "#3700E6"),
-        (440, 460, "#0046FF"),
-        (460, 480, "#00A9FF"),
-        (480, 500, "#00FFFF"),
-        (500, 520, "#00FF00"),
-        (520, 540, "#5DFF00"),
-        (540, 560, "#A2FF00"),
-        (560, 580, "#E1FF00"),
-        (580, 600, "#FFDF00"),
-        (600, 620, "#FF9B00"),
-        (620, 640, "#FF4E00"),
-        (640, 660, "#F80000"),
-        (660, 680, "#DC0000"),
-        (680, 700, "#BF0000"),
-        (700, 780, "#A10000"),
-    ]
+    """Visual mapping of 380‑780 nm → Hex colour using a CIE‑based approximation."""
+    if nm < 380 or nm > 780:
+        return "#FFFFFF"
 
-    for lo, hi, hexcode in bands:
-        if lo <= nm < hi:
-            return hexcode
-    return "#FFFFFF"
+    # Intensity attenuation near the vision limits
+    if 380 <= nm < 420:
+        attenuation = 0.3 + 0.7 * (nm - 380) / 40
+    elif 700 < nm <= 780:
+        attenuation = 0.3 + 0.7 * (780 - nm) / 80
+    else:
+        attenuation = 1.0
+
+    # Un‐gamma‑corrected RGB
+    if   380 <= nm < 440:
+        r, g, b = -(nm - 440) / 60, 0.0, 1.0
+    elif 440 <= nm < 490:
+        r, g, b = 0.0, (nm - 440) / 50, 1.0
+    elif 490 <= nm < 510:
+        r, g, b = 0.0, 1.0, -(nm - 510) / 20
+    elif 510 <= nm < 580:
+        r, g, b = (nm - 510) / 70, 1.0, 0.0
+    elif 580 <= nm < 645:
+        r, g, b = 1.0, -(nm - 645) / 65, 0.0
+    else:  # 645‑700
+        r, g, b = 1.0, 0.0, 0.0
+
+    gamma = 0.8
+    def _corr(c: float) -> int:
+        return 0 if c <= 0 else int(round((attenuation * (c ** gamma)) * 255))
+
+    return f"#{_corr(r):02X}{_corr(g):02X}{_corr(b):02X}"
 
 
 def complement_hex(hexcode: str) -> str:
@@ -93,6 +103,59 @@ def average_aom(ligand_counts: dict[str, int]) -> tuple[float, float, float]:
     if site_sum == 0:
         return 0, 0, 0
     return es_sum / site_sum, epi_sum / site_sum, epi_star_sum / site_sum
+
+
+# ------------------------------------------------------------------
+def beta_from_lf(lf: float) -> float:
+    """Fallback β from LF via linear regression."""
+    a = beta_regression["a"]
+    b = beta_regression["b"]
+    β = a + b * (lf - 0.90)
+    return max(0.65, min(1.05, β))
+
+def average_beta(ligand_counts: dict[str, int]) -> float:
+    """Donor‑site‑weighted average nephelauxetic factor β̄."""
+    total_sites = sum(ligand_data[lig]["dent"] * n
+                      for lig, n in ligand_counts.items())
+    if total_sites == 0:
+        return 0.92   # benign default
+    β_sum = 0.0
+    for lig, n in ligand_counts.items():
+        sites = ligand_data[lig]["dent"] * n
+        lf    = ligand_data[lig]["LF"]
+        β     = beta_ligand.get(lig, beta_from_lf(lf))
+        β_sum += β * sites
+    return β_sum / total_sites
+
+def predict_spin_state(metal: str,
+                       dn: str,
+                       geometry: str,
+                       delta_cm: float,
+                       β_bar: float) -> tuple[str, int]:
+    """
+    Decide HS/LS based on Δ vs. pairing energy P = β̄ P₀.
+    Returns (spin, n_unpaired).
+    """
+    if geometry not in ("Octahedral", "Square-Planar"):
+        return "HS", {"d4":4,"d5":5,"d6":4,"d7":3}.get(dn, 0)
+
+    P0 = metal_P_free[metal]
+    P  = β_bar * P0
+
+    # low‑spin window only relevant for d4–d7
+    if dn in ("d4","d5","d6","d7"):
+        spin = "LS" if delta_cm > P else "HS"
+    else:
+        spin = "HS"
+
+    unpaired_map = {
+        ("d4","HS"):4, ("d4","LS"):2,
+        ("d5","HS"):5, ("d5","LS"):1,
+        ("d6","HS"):4, ("d6","LS"):0,
+        ("d7","HS"):3, ("d7","LS"):1,
+    }
+    n_u = unpaired_map.get((dn, spin), 0)
+    return spin, n_u
 
 
 st.title("Ligand Field Colour Predictor")
@@ -185,8 +248,14 @@ else:
 
         ten_Dq_base = abs(ten_Dq_base)  # magnitude only for band energies
 
-        dn, spin = electron_config[metal]
-        ratios = ts_bands.get((dn, spin, geometry), ts_bands.get((dn, spin, "Octahedral")))
+        # --- Nephelauxetic correction & spin state ---------------------
+        β_bar  = average_beta(ligand_counts)
+        dn, _  = electron_config[metal]        # ignore preset spin
+        spin, n_unpaired = predict_spin_state(metal, dn, geometry, ten_Dq_base, β_bar)
+
+        ratios = ts_bands.get((dn, spin, geometry)) \
+            or ts_bands.get((dn, spin, "Octahedral")) \
+            or [1.00]   # fallback to a single‑ratio list to avoid None
 
         visible_nms: list[float] = []
         for r in ratios:
@@ -213,6 +282,25 @@ else:
                         if 380 <= ct_nm <= 780:
                             visible_nms = [ct_nm]
                             break
+
+        def _show_spectrum(nms: list[float]) -> None:
+            """Plot vertical lines for predicted absorption bands."""
+            fig, ax = plt.subplots(figsize=(4, 1.8))
+            for nm in nms:
+                ax.axvline(nm, color=nm_to_rgb(nm), linewidth=3)
+            ax.set_xlim(380, 780)
+            ax.set_xticks([400, 500, 600, 700])
+            ax.set_xlabel("λ (nm)")
+            ax.set_yticks([])
+            ax.set_title("Predicted absorption bands", fontsize=9)
+            st.pyplot(fig)
+
+        _show_spectrum(visible_nms)
+
+        st.markdown(
+            f"**Spin state:** {spin} &nbsp;|&nbsp; **Unpaired e⁻:** {n_unpaired} "
+            f"&nbsp;|&nbsp; β̄ ≈ {β_bar:.2f}"
+        )
 
         # Colour swatch: mix complements of all visible bands
         absorbed_hexes = [nm_to_rgb(nm) for nm in visible_nms]
