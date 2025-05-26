@@ -237,22 +237,25 @@ else:
 
     # calculation
     if submit:
-        # --- Angular Overlap Model ----------------------------------------
-        e_sigma, e_pi, e_pi_star = average_aom(ligand_counts)
+        # --- Experimental baseline vs. AOM ----------------------------------------
+        lf_bar = average_lf(ligand_counts)
 
-        # Base octahedral 10 Dq from AOM: ΔOct = 3 eσ – 4 eπ  (LibreTexts Eq {1})
-        delta_oct = 3 * e_sigma - 4 * e_pi
-
-        # Geometry conversion
-        if geometry == "Octahedral":
-            ten_Dq_base = delta_oct
-        elif geometry == "Tetrahedral":
-            ten_Dq_base = (-4 / 9) * delta_oct
+        if metal in metal_DqH2O:
+            # Empirical route: scale the known hexaaqua splitting by LF
+            ten_Dq_base = metal_DqH2O[metal] * lf_bar
         else:
-            # fallback to existing empirical scale for less common geometries
-            ten_Dq_base = delta_oct * geometry_scale.get(geometry, 1.0)
+            # Fallback to Angular Overlap Model if no reference value exists
+            e_sigma, e_pi, e_pi_star = average_aom(ligand_counts)
+            delta_oct = 3 * e_sigma - 4 * e_pi
+            ten_Dq_base = abs(delta_oct)
 
-        ten_Dq_base = abs(ten_Dq_base)  # magnitude only for band energies
+        # Geometry conversion (apply only once, after reference scaling)
+        if geometry == "Tetrahedral":
+            ten_Dq_base *= 4 / 9
+        elif geometry == "Square-Planar":
+            ten_Dq_base *= 1.35
+        else:
+            ten_Dq_base *= geometry_scale.get(geometry, 1.0)
 
         # --- Nephelauxetic correction & spin state ---------------------
         β_bar  = average_beta(ligand_counts)
